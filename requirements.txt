@@ -1,0 +1,11 @@
+gspread>=6.0.0
+google-auth>=2.0.0
+pywinauto>=0.6.8
+PyAutoGUI>=0.9.54
+pyperclip>=1.8.0
+psutil>=5.9.0
+pywin32>=306
+pandas>=2.0.0
+PySide6>=6.5.0
+opencv-python>=4.8.0
+requests>=2.30.0
