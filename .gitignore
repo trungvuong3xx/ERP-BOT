@@ -1,0 +1,22 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyInstaller build outputs (>100MB exceeds GitHub limit)
+build/
+dist/
+
+# Credentials & Sensitive Tokens
+credentials.json
+
+# Logs & Databases
+*.log
+*.db
+*.sqlite3
+
+# Temporary / Scratch files
+temp_*.txt
+*_edits.txt
+bat_output.txt
+sample.json

@@ -73,14 +73,16 @@ def is_invi08_open():
 
 ## 4. TỰ ĐỘNG HÓA THAO TÁC WIN32 GUI ERP
 
-### Bảng So Sánh Quy Tắc Giữa 2 Trang Tính:
+### Bảng So Sánh Quy Tắc Giữa Các Quy Trình:
 
-| Bước Thao Tác | Trang `ERP Chỉ` | Trang `ERP Nhựa` |
-| :--- | :---: | :---: |
-| **BƯỚC 5: Loại Phiếu** | `1201` | `1201` |
-| **BƯỚC 7 - 8: Mã Bộ Phận** | **`3820`** | **`3810`** |
-| **BƯỚC 11 - 12: Mã Kho Nhập** | **`C21`** | **`C11`** |
-| **Tọa Độ Y Nhảy Dòng (Row 2+)** | $Y_k = 535 + (k-1) \times 20$ | $Y_k = 535 + (k-1) \times 20$ |
+| Bước Thao Tác | Trang `ERP Chỉ` (INVI08) | Trang `ERP Nhựa` (INVI08) | Bảng `BTP` - Tab `Tổng Hợp` (COPMI08) |
+| :--- | :---: | :---: | :---: |
+| **Loại Phiếu** | `1201` | `1201` | `A234` (tại X=167, Y=198) |
+| **Mã Bộ Phận / Khách hàng** | `3820` | `3810` | `VN0003` (Khách hàng) |
+| **Mã Kho Nhập** | `C21` | `C11` | N/A |
+| **Chi Tiết Dòng 1** | Mã SP tại (166, 535) | Mã SP tại (166, 535) | Mã SP (Cột P) tại (341, 513) |
+| **Thao Tác Nhảy Dòng** | Phím Down ($Y_k = 535 + (k-1) \times 20$) | Phím Down ($Y_k = 535 + (k-1) \times 20$) | P(i) -> TABx2 -> G(i) [Kg] -> TABx2 -> F(i) [Tấm] -> TABx1 -> J(i) [Ghi chú] -> Phím Down -> TAB |
+
 
 ---
 

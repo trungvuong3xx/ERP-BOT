@@ -13,7 +13,7 @@ from cv_engine import CVEngine
 
 # Bật PyAutoGUI FAILSAFE để cho phép người dùng dừng khẩn cấp bằng cách đẩy chuột về góc trên bên trái (0, 0)
 pyautogui.FAILSAFE = True
-pyautogui.PAUSE = 0.3
+pyautogui.PAUSE = 0.05
 
 logger = logging.getLogger("ERPAutomation.GUI")
 
@@ -54,12 +54,20 @@ class ERPGUIController:
             except Exception as e:
                 logger.warning(f"Không thể kết nối trực tiếp PID {pid}: {e}. Sẽ mở ứng dụng mới.")
 
+        if os.path.isdir(self.exe_path):
+            possible_lnk = os.path.join(self.exe_path, "WorkFlow ERP iGP.lnk")
+            if os.path.exists(possible_lnk):
+                self.exe_path = possible_lnk
+
         if not os.path.exists(self.exe_path):
             raise FileNotFoundError(f"Không tìm thấy tệp thực thi ERP tại: {self.exe_path}")
 
         logger.info(f"Đang khởi chạy ERP từ đường dẫn: {self.exe_path}")
-        exe_dir = os.path.dirname(self.exe_path)
-        subprocess.Popen([self.exe_path], cwd=exe_dir)
+        if self.exe_path.lower().endswith(".lnk"):
+            os.startfile(self.exe_path)
+        else:
+            exe_dir = os.path.dirname(self.exe_path)
+            subprocess.Popen([self.exe_path], cwd=exe_dir)
         time.sleep(4)
 
         new_pid = self.find_running_erp()
@@ -80,14 +88,17 @@ class ERPGUIController:
             target_thread, _ = win32process.GetWindowThreadProcessId(hwnd)
             
             if current_thread != target_thread:
-                win32gui.AttachThreadInput(current_thread, target_thread, True)
+                win32process.AttachThreadInput(current_thread, target_thread, True)
                 
-            show_cmd = win32con.SW_SHOWMAXIMIZED if maximize else win32con.SW_SHOW
-            win32gui.ShowWindow(hwnd, show_cmd)
+            # Không dùng SW_SHOWMAXIMIZED vì sẽ ép Windows kéo khung làm vỡ giao diện bên trong (Cửa sổ vô hình)
+            if maximize:
+                show_cmd = win32con.SW_RESTORE
+                win32gui.ShowWindow(hwnd, show_cmd)
+                
             win32gui.SetForegroundWindow(hwnd)
             
             if current_thread != target_thread:
-                win32gui.AttachThreadInput(current_thread, target_thread, False)
+                win32process.AttachThreadInput(current_thread, target_thread, False)
                 
             time.sleep(0.5)
             return True
@@ -123,24 +134,40 @@ class ERPGUIController:
             time.sleep(0.5)
 
     def focus_erp_window(self):
-        """Kích hoạt và đưa cửa sổ ERP hiển thị lên phía trước (giữ nguyên trạng thái Phóng to Trang chủ)."""
+        """Kích hoạt và đưa cửa sổ Trang chủ ERP hiển thị lên phía trước (Sử dụng ctypes thay cho click mù)."""
         try:
-            if self.app:
-                top_win = self.app.top_window()
-                hwnd = top_win.handle
-                win32gui.ShowWindow(hwnd, win32con.SW_SHOW)
-                win32gui.SetForegroundWindow(hwnd)
-                time.sleep(0.5)
+            import ctypes
+            from ctypes import wintypes
+            user32 = ctypes.windll.user32
+            erp_pid = self.find_running_erp()
+            
+            found_hwnd = []
+            def enum_win_cb(hwnd, lparam):
+                if user32.IsWindowVisible(hwnd):
+                    pid = wintypes.DWORD()
+                    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                    
+                    if not erp_pid or pid.value == erp_pid:
+                        length = user32.GetWindowTextLengthW(hwnd)
+                        if length > 0:
+                            buf = ctypes.create_unicode_buffer(length + 1)
+                            user32.GetWindowTextW(hwnd, buf, length + 1)
+                            title = buf.value.lower()
+                            # Lọc chỉ lấy Trang chủ ERP (Tránh cửa sổ con)
+                            if "workflow erp igp" in title and "đăng nhập" not in title and "invi08" not in title and "purmi09" not in title and "thiết lập" not in title and "nhập kho" not in title and "nhap kho" not in title and "nhập mua" not in title:
+                                found_hwnd.append(hwnd)
+                                return False
+                return True
+
+            WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+            user32.EnumWindows(WNDENUMPROC(enum_win_cb), 0)
+            
+            if found_hwnd:
+                logger.info("--> TỰ ĐỘNG PHÁT HIỆN: Đang ở Trang chủ ERP, Đang tiến hành Focus...")
+                self.focus_window_by_hwnd(found_hwnd[0], maximize=True)
                 return True
         except Exception as e:
-            logger.warning(f"Không thể Focus cửa sổ ERP bằng win32gui: {e}")
-            try:
-                if self.app:
-                    self.app.top_window().set_focus()
-                    time.sleep(0.5)
-                    return True
-            except Exception as ex:
-                logger.warning(f"Không thể set_focus cửa sổ ERP: {ex}")
+            logger.warning(f"Lỗi khi Focus cửa sổ ERP bằng ctypes: {e}")
         return False
 
     def is_login_dialog_open(self) -> bool:
@@ -149,21 +176,39 @@ class ERPGUIController:
             import ctypes
             from ctypes import wintypes
             user32 = ctypes.windll.user32
+            
+            erp_pid = self.find_running_erp()
 
             found_login = []
             found_hwnd = []
 
             def enum_win_cb(hwnd, lparam):
                 if user32.IsWindowVisible(hwnd):
+                    # Lọc triệt để: Chỉ chấp nhận cửa sổ thuộc về MainMenu.exe
+                    pid = wintypes.DWORD()
+                    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                    
                     length = user32.GetWindowTextLengthW(hwnd)
                     if length > 0:
                         buf = ctypes.create_unicode_buffer(length + 1)
                         user32.GetWindowTextW(hwnd, buf, length + 1)
                         title = buf.value
-                        if "đăng nhập" in title.lower() or "login" in title.lower() or "mật khẩu" in title.lower():
-                            found_login.append(title)
-                            found_hwnd.append(hwnd)
-                            return False
+                        title_lower = title.lower()
+                        
+                        # Bỏ qua các cửa sổ rác (trình duyệt, Zalo, thư mục...)
+                        if "chrome" in title_lower or "cốc cốc" in title_lower or "edge" in title_lower or "code" in title_lower:
+                            return True
+                        if "quên mật khẩu" in title_lower or "mở khóa" in title_lower:
+                            return True
+                            
+                        if "đăng nhập" in title_lower or "login" in title_lower or "mật khẩu" in title_lower:
+                            # Đảm bảo không bắt nhầm các cửa sổ không liên quan
+                            if "thiết lập" not in title_lower and "thiet lap" not in title_lower:
+                                # Nếu erp_pid có tồn tại thì ép buộc PID phải khớp
+                                if not erp_pid or pid.value == erp_pid:
+                                    found_login.append(title)
+                                    found_hwnd.append(hwnd)
+                                    return False
                 return True
 
             WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
@@ -229,12 +274,18 @@ class ERPGUIController:
                         buf = ctypes.create_unicode_buffer(length + 1)
                         user32.GetWindowTextW(hwnd, buf, length + 1)
                         title = buf.value
-                        if "INVI08" in title or "chuyển kho" in title.lower() or "chuyen kho" in title.lower():
-                            if "thiết lập" not in title.lower() and "thiet lap" not in title.lower():
-                                if "workflow" not in title.lower() and "igp" not in title.lower():
-                                    found_title.append(title)
-                                    found_hwnd.append(hwnd)
-                                    return False  # Dừng quét nếu tìm thấy
+                        title_lower = title.lower()
+                        # Loại trừ các cửa sổ trình duyệt, thư mục, hoặc cửa sổ bot
+                        if "chrome" in title_lower or "cốc cốc" in title_lower or "edge" in title_lower or "code" in title_lower:
+                            return True
+                        if "automation suite" in title_lower or "pycharm" in title_lower:
+                            return True
+                            
+                        # Kiểm tra xem có chứa từ khóa INVI08 không
+                        if "invi08" in title_lower or "chuyển kho" in title_lower or "chuyen kho" in title_lower:
+                            found_title.append(title)
+                            found_hwnd.append(hwnd)
+                            return False  # Dừng quét nếu tìm thấy
                         
                 return True
 
@@ -269,20 +320,20 @@ class ERPGUIController:
             # Bước 2: Click mở INVI08
             x_open, y_open = coords.get("open_invi08", [1095, 337])
             logger.info(f"Bước 2: Click mở INVI08 tại ({x_open}, {y_open})")
-            # Click [500, 10] trước để Focus ERP lên trên cùng nếu Bot đang đè
-            self.smart_click(fallback_xy=(500, 10))
+            # Focus ERP Home Page bằng API an toàn
+            self.focus_erp_window()
             time.sleep(0.5)
             self.smart_click(fallback_xy=(x_open, y_open), image_path="templates/btn_invi08.png")
             time.sleep(2)
 
-            # KHÁCH HÀNG XÁC NHẬN: "Cửa sổ INVI08 lúc nào cũng maxsize"
-            # TUYỆT ĐỐI KHÔNG CLICK [1417, 251] NỮA, VÌ SẼ BỊ TRÚNG NÚT [X] (ĐÓNG CỬA SỔ)!
-            logger.info("Bước 3: Cửa sổ INVI08 luôn tự động Maximize. Bỏ qua lệnh click Maximize để tránh rủi ro.")
+            # Bước 3: Click Maximize (Khách hàng yêu cầu dùng chuột click tọa độ cũ để tránh lỗi)
+            logger.info("Bước 3: Khôi phục lệnh click Maximize tại [1417, 251] theo yêu cầu.")
+            pyautogui.click(1417, 251)
             time.sleep(1)
         else:
-            logger.info("--> TỰ ĐỘNG PHÁT HIỆN: Màn hình INVI08 ĐÃ MỞ SẴN! Đang dùng API để Focus cửa sổ INVI08 lên trên cùng...")
+            logger.info("--> TỰ ĐỘNG PHÁT HIỆN: Màn hình INVI08 ĐÃ MỞ SẴN! Đang tiến hành Focus...")
             if invi08_hwnd:
-                self.focus_window_by_hwnd(invi08_hwnd, maximize=True)
+                self.focus_window_by_hwnd(invi08_hwnd, maximize=False)
             time.sleep(0.5)
 
         # Bước 4: Click nút Thêm
@@ -313,9 +364,16 @@ class ERPGUIController:
         sheet_name_curr = items_for_day[0].get("sheet_name", "ERP Chỉ") if items_for_day else "ERP Chỉ"
         sheet_key = "nhua" if "Nhựa" in sheet_name_curr else "chi"
         cat_defaults = defaults.get(sheet_key, {})
+        
+        category_name = items_for_day[0].get("category", "").upper() if items_for_day else ""
+        is_nhap_tra_x5 = (category_name == "NHẬP TRẢ X5")
 
-        # Bước 7 & 8: Bấm TAB nhảy vào Mã bộ phận -> gõ (3820 cho ERP Chỉ, 3810 cho ERP Nhựa)
-        dept_code = cat_defaults.get("department_code", "3810" if sheet_key == "nhua" else "3820")
+        # Bước 7 & 8: Bấm TAB nhảy vào Mã bộ phận -> gõ (3820 cho ERP Chỉ, 3810 cho ERP Nhựa, hoặc 3350 cho NHẬP TRẢ X5)
+        if is_nhap_tra_x5:
+            dept_code = "3350"
+        else:
+            dept_code = cat_defaults.get("department_code", "3810" if sheet_key == "nhua" else "3820")
+            
         logger.info(f"Bước 7-8: Bấm TAB nhảy vào ô Mã bộ phận (Trang '{sheet_name_curr}') -> Gõ: '{dept_code}'")
         pyautogui.press('tab')
         time.sleep(0.3)
@@ -350,29 +408,45 @@ class ERPGUIController:
 
             # Click & Dán Mã SP tại (166, Y_curr)
             pyautogui.click(x_code1, y_curr)
-            time.sleep(0.1)
+            time.sleep(0.02)
             pyperclip.copy(item['code'])
             pyautogui.hotkey('ctrl', 'v')
-            time.sleep(0.1)
+            time.sleep(0.02)
 
             # Click & Dán Số lượng tại (500, Y_curr)
             pyautogui.click(x_qty1, y_curr)
-            time.sleep(0.1)
+            time.sleep(0.02)
             pyperclip.copy(str(qty_val))
             pyautogui.hotkey('ctrl', 'v')
-            time.sleep(0.1)
+            time.sleep(0.02)
 
-            # Chỉ dòng 1 mới nhập ô Nhập kho 'C21' tại (1440, 535)
-            if is_first:
-                pyautogui.click(x_wh1, y_wh1)
-                time.sleep(0.1)
-                pyperclip.copy(wh_code)
+            if is_nhap_tra_x5:
+                # Custom logic for Nhập trả X5
+                pyautogui.click(880, y_curr)
+                time.sleep(0.02)
+                pyperclip.copy("C21")
                 pyautogui.hotkey('ctrl', 'v')
-                time.sleep(0.1)
+                time.sleep(0.02)
+                
+                if is_first:
+                    # Tab and H10
+                    pyautogui.press('tab')
+                    time.sleep(0.02)
+                    pyperclip.copy("H10")
+                    pyautogui.hotkey('ctrl', 'v')
+                    time.sleep(0.02)
+            else:
+                # Chỉ dòng 1 mới nhập ô Nhập kho tại (1440, 535)
+                if is_first:
+                    pyautogui.click(x_wh1, y_wh1)
+                    time.sleep(0.02)
+                    pyperclip.copy(wh_code)
+                    pyautogui.hotkey('ctrl', 'v')
+                    time.sleep(0.02)
 
             # Bấm phím Mũi tên xuống (Down Arrow) để tạo/chuyển dòng
             pyautogui.press('down')
-            time.sleep(0.15)
+            time.sleep(0.05)
 
             # Tự động kiểm tra và kích hoạt bấm OK/Enter nếu xuất hiện Cảnh báo (VD: Cảnh báo hàng xuất/thiếu NVL)
             self.dismiss_warning_dialog_if_any()
@@ -397,12 +471,17 @@ class ERPGUIController:
                         buf = ctypes.create_unicode_buffer(length + 1)
                         user32.GetWindowTextW(hwnd, buf, length + 1)
                         title = buf.value
-                        if "PURMI09" in title or "nhập mua" in title.lower() or "nhap mua" in title.lower():
-                            if "thiết lập" not in title.lower() and "thiet lap" not in title.lower():
-                                if "workflow" not in title.lower() and "igp" not in title.lower():
-                                    found_title.append(title)
-                                    found_hwnd.append(hwnd)
-                                    return False  # Dừng quét nếu tìm thấy
+                        title_lower = title.lower()
+                        # Loại trừ các cửa sổ trình duyệt, thư mục, hoặc cửa sổ bot
+                        if "chrome" in title_lower or "cốc cốc" in title_lower or "edge" in title_lower or "code" in title_lower:
+                            return True
+                        if "automation suite" in title_lower or "pycharm" in title_lower:
+                            return True
+                            
+                        if "purmi09" in title_lower or "nhập mua" in title_lower or "nhap mua" in title_lower or "nhập kho" in title_lower or "nhap kho" in title_lower:
+                            found_title.append(title)
+                            found_hwnd.append(hwnd)
+                            return False  # Dừng quét nếu tìm thấy
                         
                 return True
 
@@ -416,7 +495,7 @@ class ERPGUIController:
             logger.warning(f"Lỗi khi quét nhận diện cửa sổ PURMI09: {e}")
         return False
 
-    def process_purmi09_voucher(self, date_str: str, items_for_day: list, skip_open: bool = False):
+    def process_purmi09_voucher(self, date_str: str, items_for_day: list, coords: dict, defaults: dict, skip_open: bool = False):
         """
         Quy trình tự động hóa cho chứng từ NHẬP FOR (PURMI09) trên ERP theo đúng chỉ thị của Hoàng Thượng.
         Hỗ trợ tính khoảng cách dòng xuống Y + 20px chính xác.
@@ -432,30 +511,34 @@ class ERPGUIController:
 
         if not already_open:
             logger.info("--> TỰ ĐỘNG PHÁT HIỆN: Đang ở Trang chủ ERP. Thực hiện Mở PURMI09 (Bước 1)...")
-            # Bước 1: Click mở PURMI09 tại (800, 250)
-            logger.info("Bước 1: Click mở PURMI09 tại tọa độ (800, 250)")
-            # Click [500, 10] trước để Focus ERP lên trên cùng nếu Bot đang đè
-            pyautogui.click(500, 10)
+            # Bước 1: Click mở PURMI09
+            x_open, y_open = coords.get("open_purmi09", [800, 250])
+            logger.info(f"Bước 1: Click mở PURMI09 tại tọa độ ({x_open}, {y_open})")
+            # Focus ERP Home Page bằng API an toàn
+            self.focus_erp_window()
             time.sleep(0.5)
-            pyautogui.click(800, 250)
+            self.smart_click(fallback_xy=(x_open, y_open), image_path="templates/btn_purmi09.png")
             time.sleep(2)
 
-            logger.info("Bước 2: Cửa sổ PURMI09 luôn tự động Maximize. Bỏ qua lệnh click Maximize.")
+            logger.info("Bước 2: Click Maximize tại [1448, 216] để tránh lỗi cửa sổ ẩn.")
+            pyautogui.click(1448, 216)
             time.sleep(1)
         else:
-            logger.info("--> TỰ ĐỘNG PHÁT HIỆN: Màn hình PURMI09 ĐÃ MỞ SẴN! Đang dùng API để Focus cửa sổ PURMI09 lên trên cùng...")
+            logger.info("--> TỰ ĐỘNG PHÁT HIỆN: Màn hình PURMI09 ĐÃ MỞ SẴN! Đang tiến hành Focus...")
             if purmi09_hwnd:
-                self.focus_window_by_hwnd(purmi09_hwnd, maximize=True)
+                self.focus_window_by_hwnd(purmi09_hwnd, maximize=False)
             time.sleep(0.5)
 
-        # Bước 3: Click nút Thêm tại (27, 130)
-        logger.info("Bước 3: Click nút Thêm tại tọa độ (27, 130)")
-        pyautogui.click(27, 130)
+        # Bước 3: Click nút Thêm
+        x_add, y_add = coords.get("btn_add", [27, 130])
+        logger.info(f"Bước 3: Click nút Thêm tại tọa độ ({x_add}, {y_add})")
+        pyautogui.click(x_add, y_add)
         time.sleep(1.5)
 
-        # Bước 4: Click ô Loại chứng từ tại (170, 197) -> dán A343 -> Bấm Tab
-        logger.info("Bước 4: Click ô Loại chứng từ tại (170, 197) -> Gõ 'A343' -> Bấm TAB")
-        pyautogui.click(170, 197)
+        # Bước 4: Click ô Loại chứng từ -> dán A343 -> Bấm Tab
+        x_sup, y_sup = coords.get("supplier_field", [170, 197])
+        logger.info(f"Bước 4: Click ô Loại chứng từ/NCC tại ({x_sup}, {y_sup}) -> Gõ 'A343' -> Bấm TAB")
+        pyautogui.click(x_sup, y_sup)
         time.sleep(0.3)
         pyperclip.copy("A343")
         pyautogui.hotkey('ctrl', 'v')
@@ -477,10 +560,9 @@ class ERPGUIController:
         time.sleep(0.3)
 
         # Tọa độ dòng 1
-        x_code_base = 377
-        x_qty_base = 638
+        x_code_base, y_first_row = coords.get("item_code_first", [377, 482])
+        x_qty_base, _ = coords.get("item_qty_first", [638, 482])
         x_dept_base = 175
-        y_first_row = 482
         row_delta_y = 20  # Mỗi dòng xuống Y + 20px
 
         # Bước 6, 7, 8 & 9: Nhập từng dòng sản phẩm với Y + 20px mỗi dòng
@@ -515,12 +597,6 @@ class ERPGUIController:
             pyautogui.press('down')
             time.sleep(0.3)
 
-            # Click trực tiếp Nút OK tại tọa độ (1030, 592) do Hoàng Thượng ấn định để đóng Cảnh báo (W-100127) nếu có
-            pyautogui.click(1030, 592)
-            time.sleep(0.2)
-            pyautogui.press('enter')
-            time.sleep(0.2)
-
             # Tự động kiểm tra và xử lý bổ sung nếu cửa sổ cảnh báo vẫn còn
             self.dismiss_warning_dialog_if_any()
 
@@ -529,32 +605,52 @@ class ERPGUIController:
 
     def dismiss_warning_dialog_if_any(self) -> bool:
         """
-        Tự động kiểm tra và xử lý các hộp thoại Cảnh báo/Lỗi bằng PyWinAuto.
+        Tự động kiểm tra và xử lý các hộp thoại Cảnh báo/Lỗi.
+        Sử dụng ctypes siêu tốc để quét mọi cửa sổ (bao gồm cả cửa sổ con) nhằm đảm bảo không bỏ sót hộp thoại nào.
         """
         try:
-            from pywinauto import Desktop
-            desktop = Desktop(backend="win32")
-            dialogs = desktop.windows(class_name="#32770", visible_only=True)
-            dismissed = False
-            for dlg in dialogs:
-                title = dlg.window_text().lower()
-                if any(k in title for k in ["lỗi", "cảnh báo", "w-100", "thiếu", "nguyên vật liệu", "thao tác", "error", "warning", "confirm", "xác nhận"]):
-                    logger.info(f"--> [Smart Dialog] Phát hiện popup '{title}'. Đang xử lý tự động...")
-                    try:
-                        dlg.set_focus()
-                        dlg.send_keystrokes("{ENTER}")
-                        time.sleep(0.3)
-                        if dlg.exists():
-                            dlg.close()
-                        dismissed = True
-                    except Exception as ex:
-                        logger.warning(f"Không thể gửi phím Enter, thử đóng bắt buộc: {ex}")
-                        try:
-                            dlg.close()
-                            dismissed = True
-                        except:
-                            pass
-            return dismissed
+            import ctypes
+            from ctypes import wintypes
+            user32 = ctypes.windll.user32
+            
+            WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+            
+            # Biến lưu trạng thái
+            state = {"dismissed": False}
+            
+            def enum_win_cb(hwnd, lparam):
+                if user32.IsWindowVisible(hwnd):
+                    length = user32.GetWindowTextLengthW(hwnd)
+                    if length > 0:
+                        buf = ctypes.create_unicode_buffer(length + 1)
+                        user32.GetWindowTextW(hwnd, buf, length + 1)
+                        title = buf.value.lower()
+                        
+                        if any(k in title for k in ["lỗi", "cảnh báo", "w-100", "thiếu", "nguyên vật liệu", "thao tác", "error", "warning", "confirm", "xác nhận"]):
+                            rect = wintypes.RECT()
+                            user32.GetWindowRect(hwnd, ctypes.byref(rect))
+                            width = rect.right - rect.left
+                            height = rect.bottom - rect.top
+                            
+                            # Hộp thoại cảnh báo thường nhỏ (bỏ qua cửa sổ chính ERP > 800)
+                            if 0 < width < 800 and 0 < height < 600:
+                                logger.info(f"--> [Smart Dialog] Phát hiện popup '{buf.value}' (Kích thước: {width}x{height}). Đang xử lý tự động...")
+                                try:
+                                    user32.SetForegroundWindow(hwnd)
+                                except:
+                                    pass
+                                # Click trực tiếp Nút OK tại tọa độ do người dùng cung cấp
+                                pyautogui.click(1022, 606)
+                                time.sleep(0.02)
+                                state["dismissed"] = True
+                                return False  # Dừng quét
+                return True
+            
+            cb = WNDENUMPROC(enum_win_cb)
+            user32.EnumWindows(cb, 0)
+            
+            return state["dismissed"]
+            
         except Exception as e:
             logger.warning(f"Lỗi khi xử lý Smart Dialog: {e}")
             return False
@@ -564,3 +660,109 @@ class ERPGUIController:
         logger.info("Thực hiện bấm nút Lưu chứng từ (Ctrl+S)...")
         pyautogui.hotkey('ctrl', 's')
         time.sleep(1.5)
+
+    def process_copmi08_voucher(self, date_str: str, items: list, coords: dict = None):
+        """
+        Quy trình tự động hóa cho chứng từ COPMI08 trên ERP.
+        Người dùng luôn mở full cửa sổ sẵn.
+        Các bước:
+        Bước 1: Nhấp vào X 167 Y 198 -> Nhập A234 -> Bấm TAB
+        Bước 2: Nhập ngày ở cột C2 Ví dụ 2026/10/19 -> Bấm TAB
+        Bước 3: Nhập VN0003
+        Bước 4: Nhấp vào X 341 Y 513 -> Nhập ô P6 -> TAB 2 lần
+        Bước 5: Nhập ô G6 -> TAB 2 lần
+        Bước 6: Nhập ô F6 -> TAB 1 lần
+        Bước 7: Nhập ô J6 -> Nhấn phím mũi tên xuống -> Nhấn phím TAB
+        Bước 8+: Nhập ô P(i) -> tiếp tục lặp lại bước 5 đến bước 7 cho đến hết dữ liệu
+        """
+        if not items:
+            logger.warning("[COPMI08] Không có dữ liệu sản phẩm để nhập!")
+            return False
+
+        coords = coords or {}
+        x_head, y_head = coords.get("header_doc_type", [167, 198])
+        doc_type = coords.get("doc_type_val", "A234")
+        cust_code = coords.get("customer_val", "VN0003")
+        x_row1, y_row1 = coords.get("first_row_code", [341, 513])
+
+        logger.info(f"=== BẮT ĐẦU TẠO PHIẾU COPMI08 CHO NGÀY: {date_str} ({len(items)} DÒNG SẢN PHẨM) ===")
+        
+        # Focus cửa sổ ERP
+        self.focus_erp_window()
+        time.sleep(0.5)
+
+        # Bước 1: Nhấp vào X 167 Y 198 -> Nhập A234 -> Bấm TAB
+        logger.info(f"Bước 1: Click ô Loại phiếu tại ({x_head}, {y_head}) -> Gõ '{doc_type}' -> Bấm TAB")
+        pyautogui.click(x_head, y_head)
+        time.sleep(0.3)
+        pyperclip.copy(doc_type)
+        pyautogui.hotkey('ctrl', 'v')
+        time.sleep(0.2)
+        pyautogui.press('tab')
+        time.sleep(0.2)
+
+        # Bước 2: Nhập ngày ở cột C2 (Ví dụ 2026/10/19) -> Bấm TAB
+        logger.info(f"Bước 2: Gõ Ngày: '{date_str}' -> Bấm TAB")
+        pyperclip.copy(date_str)
+        pyautogui.hotkey('ctrl', 'v')
+        time.sleep(0.2)
+        pyautogui.press('tab')
+        time.sleep(0.2)
+
+        # Bước 3: Nhập VN0003
+        logger.info(f"Bước 3: Gõ Mã Khách hàng: '{cust_code}'")
+        pyperclip.copy(cust_code)
+        pyautogui.hotkey('ctrl', 'v')
+        time.sleep(0.3)
+
+        # Bước 4: Nhấp vào X 341 Y 513
+        logger.info(f"Bước 4: Click ô Mã SP Dòng 1 tại ({x_row1}, {y_row1})")
+        pyautogui.click(x_row1, y_row1)
+        time.sleep(0.4)
+
+        # Lặp các dòng dữ liệu
+        for idx, item in enumerate(items, start=1):
+            code_erp = item.get("code_erp", item.get("code", ""))
+            qty_kg = item.get("qty_kg", "")
+            qty_tam = item.get("qty_tam", "")
+            note = item.get("note", "")
+
+            logger.info(f"--> Nhập Dòng {idx}/{len(items)}: Mã(P)='{code_erp}' | Kg(G)='{qty_kg}' | Tấm(F)='{qty_tam}' | Ghi chú(J)='{note}'")
+
+            # Nhập ô P -> TAB 2 lần
+            pyperclip.copy(str(code_erp))
+            pyautogui.hotkey('ctrl', 'v')
+            time.sleep(0.06)
+            pyautogui.press('tab')
+            time.sleep(0.03)
+            pyautogui.press('tab')
+            time.sleep(0.06)
+
+            # Bước 5: Nhập ô G (Kg) -> TAB 2 lần
+            pyperclip.copy(str(qty_kg))
+            pyautogui.hotkey('ctrl', 'v')
+            time.sleep(0.06)
+            pyautogui.press('tab')
+            time.sleep(0.03)
+            pyautogui.press('tab')
+            time.sleep(0.06)
+
+            # Bước 6: Nhập ô F (Tấm) -> TAB 1 lần
+            pyperclip.copy(str(qty_tam))
+            pyautogui.hotkey('ctrl', 'v')
+            time.sleep(0.06)
+            pyautogui.press('tab')
+            time.sleep(0.06)
+
+            # Bước 7: Nhập ô J (Ghi chú) -> Nhấn phím mũi tên xuống -> Nhấn phím TAB
+            pyperclip.copy(str(note))
+            pyautogui.hotkey('ctrl', 'v')
+            time.sleep(0.06)
+            pyautogui.press('down')
+            time.sleep(0.05)
+            pyautogui.press('tab')
+            time.sleep(0.06)
+
+        logger.info(f"✅ ĐÃ NHẬP XONG HOÀN TẤT PHIẾU COPMI08 CHO NGÀY: {date_str} ({len(items)} DÒNG)!")
+        return True
+

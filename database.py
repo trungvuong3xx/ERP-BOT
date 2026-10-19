@@ -73,5 +73,41 @@ class BotDatabase:
                 ''', (limit,))
                 return cursor.fetchall()
         except Exception as e:
-            logger.error(f"Lỗi truy xuất lịch sử DB: {e}")
             return []
+
+    def get_daily_stats(self, limit_days=7):
+        """Lấy thống kê số lượng thành công/thất bại theo ngày."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT 
+                        run_date,
+                        SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) as success_count,
+                        SUM(CASE WHEN status != 'SUCCESS' THEN 1 ELSE 0 END) as fail_count
+                    FROM run_logs
+                    GROUP BY run_date
+                    ORDER BY run_date DESC
+                    LIMIT ?
+                ''', (limit_days,))
+                return cursor.fetchall()
+        except Exception as e:
+            logger.error(f"Lỗi lấy thống kê theo ngày: {e}")
+            return []
+
+    def get_total_stats(self):
+        """Lấy tổng số lượng xử lý từ trước đến nay."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT 
+                        SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) as total_success,
+                        SUM(CASE WHEN status != 'SUCCESS' THEN 1 ELSE 0 END) as total_fail
+                    FROM run_logs
+                ''')
+                row = cursor.fetchone()
+                return (row[0] or 0, row[1] or 0)
+        except Exception as e:
+            logger.error(f"Lỗi lấy tổng thống kê: {e}")
+            return (0, 0)

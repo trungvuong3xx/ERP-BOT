@@ -38,14 +38,15 @@ Tài liệu hướng dẫn quy trình tự động hóa nhập liệu chứng t�
 1. **Nhận Diện Cửa Sổ Con MDI INVI08 (Real-time Window Detection)**:
    - Dùng `ctypes.windll.user32.EnumWindows` và `EnumChildWindows` để soi tiêu đề các cửa sổ con chứa `"INVI08"` hoặc `"chuyển kho"`.
    - **Nếu INVI08 đã mở**: Bỏ qua Bước 2 (Mở INVI08) & Bước 3 (Maximize), bắt đầu trực tiếp từ **Bước 4 (Nút Thêm `21, 126`)**.
-   - **Nếu chưa mở**: Click `(1095, 337)` mở INVI08 $\rightarrow$ Chờ 1s cửa sổ hiện lên $\rightarrow$ Click `(1417, 251)` Maximize cửa sổ $\rightarrow$ Click `(21, 126)` nút Thêm.
+   - **Nếu chưa mở**: Click `(1095, 337)` mở INVI08 $\rightarrow$ Click `(1417, 251)` Maximize cửa sổ $\rightarrow$ Click `(21, 126)` nút Thêm.
 2. **Điền Thông Tin Chứng Từ Đầu Phân Đoạn**:
    - Click ô Loại phiếu `(197, 202)` $\rightarrow$ Gõ `1201`.
    - Bấm `Tab` $\rightarrow$ Gõ Ngày thực tế `YYYY/MM/DD`.
    - Bấm `Tab` $\rightarrow$ Gõ Mã Bộ Phận (`3820` cho Chỉ, `3810` cho Nhựa).
 3. **Nhập Chi Tiết Sản Phẩm & Nhảy Tọa Độ $Y+20\text{px}$**:
-   - **Dòng 1**: Click ô Mã SP tại `(166, 535)` $\rightarrow$ Gõ Mã SP $\rightarrow$ Tab $\rightarrow$ Gõ Số lượng $\rightarrow$ Tab $\rightarrow$ Gõ Mã Kho (`C21` cho Chỉ, `C11` cho Nhựa).
-   - **Dòng 2+**: Bấm phím Down Arrow (`↓`) để xuống dòng. Tính toán tọa độ $Y_k = 535 + (k-1) \times 20$. Không click lại Dòng 1.
+   - Tọa độ chi tiết sử dụng Click trực tiếp (Thay vì Tab để tránh lỗi cột): Mã SP `(166, 535)`, Số lượng `(500, 535)`, Nhập Kho `(1440, 535)`.
+   - **Dòng 1**: Click Ô Mã SP $\rightarrow$ Gõ Mã SP. Click Ô Số Lượng $\rightarrow$ Gõ SL. Click Ô Nhập Kho $\rightarrow$ Gõ Mã Kho (`C21` hoặc `C11`).
+   - **Dòng 2+**: Bấm phím Down Arrow (`↓`) để tạo dòng mới. Tính toán $Y_k = 535 + (k-1) \times 20$. Click Ô Mã SP ở $Y_k$ $\rightarrow$ Gõ Mã SP. Click Ô Số Lượng ở $Y_k$ $\rightarrow$ Gõ SL. Khônng cần nhập lại Ô Nhập Kho (ERP tự động copy).
 
 ---
 

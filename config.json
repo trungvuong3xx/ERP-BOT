@@ -1,45 +1,21 @@
-﻿{
-  "active_profile": "Profile 1",
-  "profiles": {
-    "Profile 1": {
-      "google_credentials_path": "C:\\Users\\Admin\\Downloads\\credentials.json",
-      "spreadsheet_title": "ERP và BÁO CÁO",
-      "erp_account": "51225",
-      "erp_password": "51225"
+{
+    "telegram_bot_token": "",
+    "telegram_chat_id": "",
+    "btp_spreadsheet_id": "1KlAdGFca-FCmTrzPrjCMUMK2pTOfMHxFFH-keCkdr1A",
+    "btp_sheet_name": "Tổng Hợp",
+    "coords_copmi08": {
+        "header_doc_type": [167, 198],
+        "first_row_code": [341, 513],
+        "doc_type_val": "A234",
+        "customer_val": "VN0003"
     },
-    "Profile 2 (Kế toán)": {
-      "google_credentials_path": "C:\\Users\\Admin\\Downloads\\credentials.json",
-      "spreadsheet_title": "ERP và BÁO CÁO",
-      "erp_account": "51226",
-      "erp_password": "51226"
+    "profiles": {
+        "Default": {
+            "telegram_bot_token": "",
+            "telegram_chat_id": "",
+            "erp_exe_path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\WorkFlow ERP iGP",
+            "erp_account": "51225",
+            "erp_password": "51225"
+        }
     }
-  },
-  "global_settings": {
-    "erp_exe_path": "C:\\ConductorX64\\C_dsbin\\MainMenu.exe",
-    "sheets": {
-      "chi": "ERP Chỉ",
-      "nhua": "ERP Nhựa"
-    },
-    "status_label": "Đã nhập ERP",
-    "coords_invi08": {
-      "open_invi08": [1095, 337],
-      "maximize_win": [1417, 251],
-      "btn_add": [21, 126],
-      "transfer_type_field": [197, 202],
-      "item_code_first": [166, 535],
-      "item_qty_first": [500, 535],
-      "item_warehouse_first": [1440, 535]
-    },
-    "invi08_defaults": {
-      "transfer_type": "1201",
-      "chi": {
-        "department_code": "3820",
-        "warehouse_code": "C21"
-      },
-      "nhua": {
-        "department_code": "3810",
-        "warehouse_code": "C11"
-      }
-    }
-  }
 }

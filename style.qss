@@ -1,0 +1,254 @@
+/* Global Reset */
+* { outline: none; }
+
+/* =======================================================
+   ERP Bot iGP - Global PySide6 Theme (Midnight Slate)
+   ======================================================= */
+
+/* --- Global Background & Text --- */
+QWidget {
+    color: #f8fafc;
+    font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+    font-size: 13px;
+    background-color: transparent;
+}
+QMainWindow, QWidget#CentralWidget, QDialog, QMessageBox, QTabWidget::pane {
+    background-color: #0f172a; /* Slate 900 */
+}
+
+/* Let specific containers have a slightly lighter background for depth */
+QFrame#HeaderCard, QFrame#ConfigCard, QFrame#LogCard, QWidget#TabSettings {
+    background-color: #1e293b; /* Slate 800 */
+    border: 1px solid #334155;
+    border-radius: 12px;
+}
+
+/* --- Labels --- */
+QLabel {
+    background-color: transparent; /* Labels shouldn't draw backgrounds */
+    border: none;
+}
+QLabel#HeaderTitle {
+    font-size: 18px;
+    font-weight: 800;
+}
+QLabel#HeaderSub {
+    color: #94a3b8;
+    font-size: 12px;
+}
+QLabel#SectionTitle {
+    font-size: 14px;
+    font-weight: 700;
+}
+QLabel#FormLabel {
+    color: #cbd5e1;
+    font-weight: 600;
+}
+QLabel#FooterTip {
+    color: #64748b;
+    font-size: 11px;
+    font-style: italic;
+}
+
+/* Status Badges */
+QLabel#StatusBadgeReady {
+    background-color: #064e3b; color: #34d399; font-weight: bold; border-radius: 12px; padding: 6px 14px;
+}
+QLabel#StatusBadgeRunning {
+    background-color: #1e3a8a; color: #60a5fa; font-weight: bold; border-radius: 12px; padding: 6px 14px;
+}
+QLabel#StatusBadgeStopped {
+    background-color: #7f1d1d; color: #fca5a5; font-weight: bold; border-radius: 12px; padding: 6px 14px;
+}
+
+/* --- Buttons (Global) --- */
+QPushButton {
+    background-color: #3b82f6; /* Blue Primary */
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-weight: 600;
+}
+QPushButton:hover {
+    background-color: #2563eb;
+}
+QPushButton:pressed {
+    background-color: #1d4ed8;
+}
+QPushButton:disabled {
+    background-color: #334155;
+    color: #94a3b8;
+}
+
+/* Specific Buttons */
+QPushButton#BtnRun {
+    background-color: #10b981; /* Emerald */
+    border-radius: 10px; font-size: 14px; font-weight: bold; padding: 10px 16px;
+}
+QPushButton#BtnRun:hover { background-color: #059669; }
+
+QPushButton#BtnStop {
+    background-color: #ef4444; /* Red */
+    border-radius: 10px; font-size: 14px; font-weight: bold; padding: 10px 16px;
+}
+QPushButton#BtnStop:hover { background-color: #dc2626; }
+
+
+QPushButton#BtnDryRun {
+    background-color: #3b82f6; /* Blue */
+    border-radius: 10px; font-size: 14px; font-weight: bold; padding: 10px 16px;
+}
+QPushButton#BtnDryRun:hover { background-color: #2563eb; }
+
+/* Toggle Pills */
+QPushButton#PillActive {
+    background-color: #10b981; color: #ffffff; border-radius: 8px; font-weight: bold; padding: 8px 16px;
+}
+QPushButton#PillInactive {
+    background-color: #334155; color: #cbd5e1; border-radius: 8px; padding: 8px 16px;
+}
+QPushButton#PillInactive:hover { background-color: #475569; }
+
+/* --- Inputs (Global) --- */
+QLineEdit, QSpinBox, QComboBox {
+    background-color: #1e293b;
+    color: #f8fafc;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-weight: 600;
+}
+QLineEdit:focus, QSpinBox:focus, QComboBox:focus,
+QLineEdit:hover, QSpinBox:hover, QComboBox:hover {
+    border-color: #3b82f6;
+}
+
+/* Dropdown specific */
+QComboBox::drop-down {
+    border: none;
+    width: 20px;
+}
+QComboBox QAbstractItemView {
+    background-color: #1e293b;
+    color: #f8fafc;
+    selection-background-color: #334155;
+    selection-color: #3b82f6;
+    border: 1px solid #475569;
+    border-radius: 4px;
+}
+
+/* --- CheckBox (Global) --- */
+QCheckBox {
+    spacing: 8px;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1px solid #475569;
+    background-color: #1e293b;
+}
+QCheckBox::indicator:hover {
+    border-color: #3b82f6;
+}
+QCheckBox::indicator:checked {
+    background-color: #3b82f6;
+    border-color: #3b82f6;
+    image: none; /* Can add a checkmark image URL here if available */
+}
+
+/* --- Tabs (Global) --- */
+QTabWidget::pane {
+    border: none;
+    background-color: transparent;
+}
+QTabBar::tab {
+    background-color: #1e293b;
+    color: #94a3b8;
+    padding: 10px 20px;
+    margin-right: 4px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    font-weight: bold;
+}
+QTabBar::tab:selected {
+    background-color: #3b82f6;
+    color: #ffffff;
+}
+QTabBar::tab:hover:!selected {
+    background-color: #334155;
+    color: #f8fafc;
+}
+
+/* --- Console Stream --- */
+QTextEdit#ConsoleStream {
+    background-color: #020617;
+    color: #f8fafc;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+    padding: 10px 16px;
+    selection-background-color: #3b82f6;
+    selection-color: #ffffff;
+}
+
+/* --- ScrollBars (Global) --- */
+QScrollBar:vertical {
+    background-color: #0f172a;
+    width: 12px;
+    margin: 0px;
+}
+QScrollBar::handle:vertical {
+    background-color: #334155;
+    min-height: 20px;
+    border-radius: 6px;
+    margin: 2px;
+}
+QScrollBar::handle:vertical:hover {
+    background-color: #475569;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+/* --- Message Boxes & Dialogs --- */
+QMessageBox, QDialog {
+    background-color: #0f172a;
+}
+QMessageBox QLabel {
+    color: #f8fafc;
+}
+QMessageBox QPushButton {
+    min-width: 80px;
+}
+
+/* Tabs */
+QTabWidget::pane {
+    border: none;
+    background-color: transparent;
+}
+QTabBar::tab {
+    background-color: #111827;
+    color: #94A3B8;
+    border: 1px solid #1E293B;
+    padding: 10px 20px;
+    font-weight: bold;
+    font-size: 13px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    margin-right: 4px;
+}
+QTabBar::tab:selected {
+    background-color: #042F2E;
+    color: #00E5FF;
+    border: 1px solid #00E5FF;
+    border-bottom: none;
+}
+QTabBar::tab:hover:!selected {
+    background-color: #1E293B;
+    color: #F8FAFC;
+}
