@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QLabel, QPushButton, QComboBox, QSpinBox, QTextEdit, QFrame, QListView,
     QMessageBox, QGraphicsDropShadowEffect, QSizePolicy, QGridLayout,
     QCheckBox, QTabWidget, QLineEdit, QScrollArea, QStackedLayout,
-    QSystemTrayIcon, QMenu
+    QSystemTrayIcon, QMenu, QStyle
 )
 from PySide6.QtGui import QColor, QFont, QIcon, QShortcut, QKeySequence, QTextCursor, QFontDatabase
 
@@ -19,6 +19,35 @@ from PySide6.QtGui import QColor, QFont, QIcon, QShortcut, QKeySequence, QTextCu
 # Lazy imports are used to speed up application startup
 from analytics_widget import AnalyticsWidget
 import qtawesome as qta
+
+# Resource Helpers
+def get_resource_path(relative_path):
+    """Lấy đường dẫn tệp tài nguyên, hỗ trợ cả chạy script trực tiếp và chạy qua PyInstaller exe."""
+    if hasattr(sys, '_MEIPASS'):
+        bundle_path = os.path.join(sys._MEIPASS, relative_path)
+        if os.path.exists(bundle_path):
+            return bundle_path
+    base_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
+    file_path = os.path.join(base_dir, relative_path)
+    if os.path.exists(file_path):
+        return file_path
+    cwd_path = os.path.join(os.getcwd(), relative_path)
+    if os.path.exists(cwd_path):
+        return cwd_path
+    return file_path
+
+def get_app_icon():
+    """Lấy QIcon của ứng dụng, ưu tiên app_icon.ico, fallback sang qtawesome robot icon."""
+    icon_path = get_resource_path("app_icon.ico")
+    if os.path.exists(icon_path):
+        return QIcon(icon_path)
+    try:
+        return qta.icon('fa5s.robot', color='#38BDF8')
+    except Exception:
+        style = QApplication.style()
+        if style:
+            return style.standardIcon(QStyle.StandardPixmap.SP_ComputerIcon)
+        return QIcon()
 
 class ToastNotification(QWidget):
     def __init__(self, parent=None):
@@ -442,11 +471,7 @@ class ERPBotApp(QMainWindow):
         
     def _setup_tray_icon(self):
         self.tray_icon = QSystemTrayIcon(self)
-        icon_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "app_icon.ico"))
-        if os.path.exists(icon_path):
-            self.tray_icon.setIcon(QIcon(icon_path))
-        else:
-            self.tray_icon.setIcon(self.style().standardIcon(self.style().SP_ComputerIcon))
+        self.tray_icon.setIcon(get_app_icon())
         
         tray_menu = QMenu()
         restore_action = tray_menu.addAction("Mở lại bảng điều khiển")
@@ -1136,9 +1161,11 @@ class ERPBotApp(QMainWindow):
 
     def _apply_qss_stylesheet(self):
         try:
-            with open("style.qss", "r", encoding="utf-8") as f:
-                qss = f.read()
-            self.setStyleSheet(qss)
+            qss_path = get_resource_path("style.qss")
+            if os.path.exists(qss_path):
+                with open(qss_path, "r", encoding="utf-8") as f:
+                    qss = f.read()
+                self.setStyleSheet(qss)
         except Exception as e:
             logging.error(f"Lỗi nạp style.qss: {e}")
 
@@ -1171,13 +1198,11 @@ def main():
             Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
         )
 
-    icon_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "app_icon.ico"))
-    if os.path.exists(icon_path):
-        app.setWindowIcon(QIcon(icon_path))
+    app_icon = get_app_icon()
+    app.setWindowIcon(app_icon)
 
     window = ERPBotApp()
-    if os.path.exists(icon_path):
-        window.setWindowIcon(QIcon(icon_path))
+    window.setWindowIcon(app_icon)
 
     window.show()
     sys.exit(app.exec())
