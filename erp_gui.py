@@ -715,7 +715,7 @@ class ERPGUIController:
     def dismiss_copmi08_dialog_if_any(self) -> bool:
         """
         Tự động phát hiện và bấm OK khi xuất hiện hộp thoại cảnh báo trên COPMI08:
-        (ví dụ: W-100091: Cảnh báo tồn kho, L-000002: Lỗi mã không tồn tại, v.v...)
+        (ví dụ: W-100091: Lượng tồn kho hoặc lượng số đợt hoặc số lượng bao bì tồn kho... không đủ)
         """
         try:
             import ctypes
@@ -734,7 +734,7 @@ class ERPGUIController:
                         title = buf.value.lower()
                         
                         # Nhận diện các popup của COPMI08 hoặc hộp thoại cảnh báo của ERP
-                        if any(k in title for k in ["copmi08", "đơn bán hàng", "thao tác", "w-100", "l-000", "cảnh báo", "lỗi", "warning", "confirm"]):
+                        if any(k in title for k in ["copmi08", "đơn bán hàng", "thao tác", "w-100", "cảnh báo", "lỗi", "warning", "confirm"]):
                             rect = wintypes.RECT()
                             user32.GetWindowRect(hwnd, ctypes.byref(rect))
                             width = rect.right - rect.left
@@ -755,17 +755,10 @@ class ERPGUIController:
                                 if not (rect.left < ok_x < rect.right and rect.top < ok_y < rect.bottom):
                                     ok_x, ok_y = 1015, 588
                                 
-                                # Click chính xác nút OK, không gửi phím Enter tránh ảnh hưởng tiêu điểm của lưới dữ liệu
                                 pyautogui.click(ok_x, ok_y)
-                                
-                                # Chờ cho đến khi popup biến mất hoàn toàn
-                                t_wait = time.time()
-                                while time.time() - t_wait < 0.6:
-                                    if not user32.IsWindow(hwnd) or not user32.IsWindowVisible(hwnd):
-                                        break
-                                    time.sleep(0.04)
-                                
-                                time.sleep(0.08)
+                                time.sleep(0.06)
+                                pyautogui.press('enter')
+                                time.sleep(0.15)
                                 state["dismissed"] = True
                                 return False
                 return True
@@ -775,24 +768,6 @@ class ERPGUIController:
         except Exception as e:
             logger.warning(f"Lỗi kiểm tra dialog COPMI08: {e}")
             return False
-
-    def wait_and_dismiss_copmi08_dialogs(self, timeout: float = 0.8) -> bool:
-        """
-        Chờ và tắt mọi hộp thoại cảnh báo/thông báo phát sinh trên COPMI08.
-        Nếu có hộp thoại xuất hiện, sẽ bấm OK và chờ cho đến khi tắt hết sạch.
-        Trả về True nếu có ít nhất 1 hộp thoại được đóng.
-        """
-        dismissed_any = False
-        t_start = time.time()
-        while time.time() - t_start < timeout:
-            if self.dismiss_copmi08_dialog_if_any():
-                dismissed_any = True
-                t_start = time.time()
-                timeout = 0.5
-                time.sleep(0.1)
-            else:
-                time.sleep(0.04)
-        return dismissed_any
 
     def process_copmi08_voucher(self, date_str: str, items: list, coords: dict = None):
         """
@@ -805,7 +780,7 @@ class ERPGUIController:
         Bước 4: Nhấp vào X 341 Y 513 -> Nhập ô P6 -> TAB 2 lần
         Bước 5: Nhập ô G6 -> TAB 2 lần
         Bước 6: Nhập ô F6 -> TAB 1 lần
-        Bước 7: Nhập ô J6 -> Nhấn phím mũi tên xuống -> Chờ tắt cảnh báo -> Nhấn phím TAB sang ô Mã SP
+        Bước 7: Nhập ô J6 -> Nhấn phím mũi tên xuống -> Nhấn phím TAB
         Bước 8+: Nhập ô P(i) -> tiếp tục lặp lại bước 5 đến bước 7 cho đến hết dữ liệu
         """
         if not items:
@@ -823,7 +798,8 @@ class ERPGUIController:
         # Focus trực tiếp cửa sổ COPMI08 đã mở sẵn max size mà không làm ẩn/thu nhỏ cửa sổ
         self.focus_copmi08_window()
         time.sleep(0.2)
-        self.wait_and_dismiss_copmi08_dialogs(timeout=0.3)
+        while self.dismiss_copmi08_dialog_if_any():
+            time.sleep(0.05)
 
         # Bước 1: Nhấp vào X 167 Y 198 -> Nhập A234 -> Bấm TAB
         logger.info(f"Bước 1: Click ô Loại phiếu tại ({x_head}, {y_head}) -> Gõ '{doc_type}' -> Bấm TAB")
@@ -863,69 +839,62 @@ class ERPGUIController:
 
             logger.info(f"--> Nhập Dòng {idx}/{len(items)}: Mã(P)='{code_erp}' | Kg(G)='{qty_kg}' | Tấm(F)='{qty_tam}' | Ghi chú(J)='{note}'")
 
-            # Đảm bảo không có popup nào che khuất trước khi paste Mã SP
-            self.wait_and_dismiss_copmi08_dialogs(timeout=0.1)
-
-            # Nhập ô P (Mã SP) -> TAB 2 lần sang ô G
+            # Nhập ô P -> TAB 2 lần
             pyperclip.copy(str(code_erp))
             pyautogui.hotkey('ctrl', 'v')
-            time.sleep(0.08)
+            time.sleep(0.06)
             pyautogui.press('tab')
-            time.sleep(0.04)
+            time.sleep(0.03)
             pyautogui.press('tab')
-            time.sleep(0.08)
-            self.wait_and_dismiss_copmi08_dialogs(timeout=0.15)
+            time.sleep(0.06)
+            while self.dismiss_copmi08_dialog_if_any():
+                time.sleep(0.05)
 
-            # Bước 5: Nhập ô G (Kg) -> TAB 2 lần sang ô F
+            # Bước 5: Nhập ô G (Kg) -> TAB 2 lần
             pyperclip.copy(str(qty_kg))
             pyautogui.hotkey('ctrl', 'v')
-            time.sleep(0.08)
+            time.sleep(0.06)
             pyautogui.press('tab')
-            time.sleep(0.04)
+            time.sleep(0.03)
             pyautogui.press('tab')
-            time.sleep(0.08)
-            self.wait_and_dismiss_copmi08_dialogs(timeout=0.15)
+            time.sleep(0.06)
+            while self.dismiss_copmi08_dialog_if_any():
+                time.sleep(0.05)
 
-            # Bước 6: Nhập ô F (Tấm) -> TAB 1 lần sang ô J
+            # Bước 6: Nhập ô F (Tấm) -> TAB 1 lần
             pyperclip.copy(str(qty_tam))
             pyautogui.hotkey('ctrl', 'v')
-            time.sleep(0.08)
+            time.sleep(0.06)
             pyautogui.press('tab')
-            time.sleep(0.08)
-            self.wait_and_dismiss_copmi08_dialogs(timeout=0.15)
+            time.sleep(0.06)
+            while self.dismiss_copmi08_dialog_if_any():
+                time.sleep(0.05)
 
             # Bước 7: Nhập ô J (Ghi chú)
             pyperclip.copy(str(note))
             pyautogui.hotkey('ctrl', 'v')
-            time.sleep(0.1)
+            time.sleep(0.08)
 
             # Chỉ cần chuyển dòng nếu chưa phải dòng cuối cùng
             if idx < len(items):
-                # 1. Bấm phím mũi tên xuống để tạo/chuyển sang dòng mới
-                logger.info(f"--> Bấm mũi tên xuống (Down) để sang Dòng {idx + 1}...")
+                # Bấm phím mũi tên xuống để tạo/chuyển sang dòng mới
                 pyautogui.press('down')
+                time.sleep(0.15)
 
-                # 2. Chờ ERP kiểm tra dữ liệu và hiển thị hộp thoại cảnh báo (W-100091) nếu có (chờ tối đa 0.8s)
-                had_dialog = self.wait_and_dismiss_copmi08_dialogs(timeout=0.8)
+                # BƯỚC QUAN TRỌNG: Kiểm tra và tắt hộp thoại cảnh báo (W-100091) TRƯỚC KHI BẤM TAB
+                # Để phím TAB không bị hộp thoại nuốt mất!
+                while self.dismiss_copmi08_dialog_if_any():
+                    time.sleep(0.1)
 
-                # 3. Kích hoạt lại cửa sổ COPMI08 để đảm bảo nhận phím chuẩn xác
-                self.focus_copmi08_window()
-                if had_dialog:
-                    logger.info("--> Đã đóng hộp thoại cảnh báo sau khi xuống dòng. Chờ 0.3s để lưới dữ liệu ổn định...")
-                    time.sleep(0.3)
-                else:
-                    time.sleep(0.18)
-
-                # 4. Tiêu điểm hiện tại đang ở ô đầu tiên ('Mã SP nghiệp vụ')
+                # Sau khi hộp thoại đã tắt hoàn toàn, tiêu điểm về ô đầu tiên ('Mã SP nghiệp vụ')
                 # Bấm TAB để chuyển sang ô 'Mã SP' cho dòng tiếp theo
-                logger.info("--> Bấm phím TAB để chuyển sang ô 'Mã SP'...")
+                time.sleep(0.12)
                 pyautogui.press('tab')
-                time.sleep(0.25)
+                time.sleep(0.1)
 
-                # 5. Kiểm tra dự phòng nếu có thông báo phát sinh sau khi TAB
-                if self.wait_and_dismiss_copmi08_dialogs(timeout=0.3):
-                    self.focus_copmi08_window()
-                    time.sleep(0.2)
+                # Kiểm tra dự phòng nếu có thông báo phát sinh sau khi TAB
+                while self.dismiss_copmi08_dialog_if_any():
+                    time.sleep(0.1)
 
         logger.info(f"✅ ĐÃ NHẬP XONG HOÀN TẤT PHIẾU COPMI08 CHO NGÀY: {date_str} ({len(items)} DÒNG)!")
         return True
