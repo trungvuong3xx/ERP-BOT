@@ -6,6 +6,8 @@ __pycache__/
 # PyInstaller build outputs (>100MB exceeds GitHub limit)
 build/
 dist/
+*.exe
+*.lnk
 
 # Credentials & Sensitive Tokens
 credentials.json
