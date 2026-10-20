@@ -31,7 +31,7 @@ class GoogleSheetsHandler:
         self.client = None
         self.spreadsheet = None
 
-    def connect(self):
+    def connect(self, spreadsheet_id: str = None):
         """Khởi tạo kết nối tới Google Sheets API với cơ chế tái sử dụng phiên (Connection Pooling)."""
         global _CACHED_CLIENT, _CACHED_SPREADSHEETS
         try:
@@ -41,10 +41,14 @@ class GoogleSheetsHandler:
                 _CACHED_CLIENT = gspread.authorize(creds)
             self.client = _CACHED_CLIENT
 
-            if self.spreadsheet_title not in _CACHED_SPREADSHEETS:
-                _CACHED_SPREADSHEETS[self.spreadsheet_title] = self.client.open(self.spreadsheet_title)
-                logger.info(f"Kết nối thành công tới bảng tính: '{self.spreadsheet_title}'")
-            self.spreadsheet = _CACHED_SPREADSHEETS[self.spreadsheet_title]
+            cache_key = spreadsheet_id or self.spreadsheet_title
+            if cache_key not in _CACHED_SPREADSHEETS:
+                if spreadsheet_id:
+                    _CACHED_SPREADSHEETS[cache_key] = self.client.open_by_key(spreadsheet_id)
+                else:
+                    _CACHED_SPREADSHEETS[cache_key] = self.client.open(self.spreadsheet_title)
+                logger.info(f"Kết nối thành công tới bảng tính: '{cache_key}'")
+            self.spreadsheet = _CACHED_SPREADSHEETS[cache_key]
             return True
         except Exception as e:
             # Nếu phiên kết nối cũ bị lỗi/hết hạn, reset bộ nhớ đệm và thử lại
@@ -392,14 +396,13 @@ class GoogleSheetsHandler:
             + Số lượng Tấm: Cột F (index 5)
             + Ghi chú: Cột J (index 9)
         """
-        if not self.client:
-            self.connect()
+        if not self.client or not self.spreadsheet:
+            self.connect(spreadsheet_id=spreadsheet_id)
 
         try:
-            logger.info(f"Đang kết nối tới bảng tính BTP ID: {spreadsheet_id} (Sheet: '{sheet_name}')...")
-            sh = self.client.open_by_key(spreadsheet_id)
-            ws = sh.worksheet(sheet_name)
-            all_vals = ws.get_all_values()
+            logger.info(f"Đang tải siêu tốc dữ liệu BTP từ Sheet: '{sheet_name}'...")
+            ws = self.spreadsheet.worksheet(sheet_name)
+            all_vals = ws.get('A1:P60')
 
             if len(all_vals) < 2:
                 logger.warning(f"Bảng tính BTP '{sheet_name}' không có đủ dữ liệu hàng 2.")
