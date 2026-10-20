@@ -1,6 +1,7 @@
 {
     "telegram_bot_token": "",
     "telegram_chat_id": "",
+    "spreadsheet_id": "1Sef8uZxN6JosgFevBC4DzkyOSit6AAcosaUQPHhIOSI",
     "btp_spreadsheet_id": "1KlAdGFca-FCmTrzPrjCMUMK2pTOfMHxFFH-keCkdr1A",
     "btp_sheet_name": "Tổng Hợp",
     "coords_copmi08": {

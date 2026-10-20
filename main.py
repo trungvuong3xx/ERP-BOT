@@ -133,8 +133,9 @@ def run_automation(dry_run=False, login_only=False, sheet_only=False, process_na
         sheet_chi_name = config.get(gs_sheets_key, {}).get("chi", "ERP Chỉ")
         sheet_nhua_name = config.get(gs_sheets_key, {}).get("nhua", "ERP Nhựa")
         
+        gs_id = config.get("spreadsheet_id", "1Sef8uZxN6JosgFevBC4DzkyOSit6AAcosaUQPHhIOSI")
         try:
-            sheets_handler.connect()
+            sheets_handler.connect(spreadsheet_id=gs_id)
             
             import concurrent.futures
             
