@@ -1110,10 +1110,11 @@ class ERPBotApp(QMainWindow):
         self.worker.status_signal.connect(self.update_status_badge)
         self.worker.finished_signal.connect(self._on_worker_finished)
         
-        # Luôn thu nhỏ cửa sổ Bot xuống Taskbar để nhường không gian cho ERP
-        self.showMinimized()
-        # Đợi một chút để OS kịp thu nhỏ và trả focus cho cửa sổ ERP nằm dưới
-        QThread.msleep(500)
+        # Luôn thu nhỏ cửa sổ Bot xuống Taskbar để nhường không gian cho ERP (trừ COPMI08 đã mở sẵn max size)
+        if self.cbo_process.currentText() != "COPMI08":
+            self.showMinimized()
+            # Đợi một chút để OS kịp thu nhỏ và trả focus cho cửa sổ ERP nằm dưới
+            QThread.msleep(500)
             
         self.worker.start()
 

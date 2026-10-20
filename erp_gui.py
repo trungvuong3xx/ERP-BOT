@@ -661,6 +661,57 @@ class ERPGUIController:
         pyautogui.hotkey('ctrl', 's')
         time.sleep(1.5)
 
+    def focus_copmi08_window(self):
+        """Kích hoạt và đưa cửa sổ COPMI08 lên foreground mà không làm thay đổi trạng thái kích thước hay ẩn cửa sổ."""
+        try:
+            import ctypes
+            from ctypes import wintypes
+            import win32gui, win32process, win32api
+            user32 = ctypes.windll.user32
+            
+            found_hwnd = []
+            def enum_win_cb(hwnd, lparam):
+                if user32.IsWindowVisible(hwnd):
+                    length = user32.GetWindowTextLengthW(hwnd)
+                    if length > 0:
+                        buf = ctypes.create_unicode_buffer(length + 1)
+                        user32.GetWindowTextW(hwnd, buf, length + 1)
+                        title = buf.value.lower()
+                        if "copmi08" in title or ("đơn bán hàng" in title and "thiết lập" in title):
+                            found_hwnd.append(hwnd)
+                            return False
+                return True
+
+            WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+            user32.EnumWindows(WNDENUMPROC(enum_win_cb), 0)
+
+            if found_hwnd:
+                hwnd = found_hwnd[0]
+                logger.info(f"--> Đã tìm thấy cửa sổ COPMI08 (HWND={hwnd}), đưa lên Foreground...")
+                
+                # Chỉ khôi phục phóng to nếu cửa sổ đang bị thu nhỏ (IsIconic)
+                if user32.IsIconic(hwnd):
+                    user32.ShowWindow(hwnd, 3)  # SW_MAXIMIZE
+                
+                current_thread = win32api.GetCurrentThreadId()
+                target_thread, _ = win32process.GetWindowThreadProcessId(hwnd)
+                if current_thread != target_thread:
+                    win32process.AttachThreadInput(current_thread, target_thread, True)
+                
+                user32.SetForegroundWindow(hwnd)
+                user32.BringWindowToTop(hwnd)
+                
+                if current_thread != target_thread:
+                    win32process.AttachThreadInput(current_thread, target_thread, False)
+                
+                time.sleep(0.3)
+                return True
+            else:
+                logger.info("--> Không tìm thấy HWND tiêu đề COPMI08, tiếp tục thực hiện trực tiếp...")
+        except Exception as e:
+            logger.warning(f"Lỗi khi focus cửa sổ COPMI08: {e}")
+        return False
+
     def process_copmi08_voucher(self, date_str: str, items: list, coords: dict = None):
         """
         Quy trình tự động hóa cho chứng từ COPMI08 trên ERP.
@@ -687,9 +738,9 @@ class ERPGUIController:
 
         logger.info(f"=== BẮT ĐẦU TẠO PHIẾU COPMI08 CHO NGÀY: {date_str} ({len(items)} DÒNG SẢN PHẨM) ===")
         
-        # Focus cửa sổ ERP
-        self.focus_erp_window()
-        time.sleep(0.5)
+        # Focus trực tiếp cửa sổ COPMI08 đã mở sẵn max size mà không làm ẩn/thu nhỏ cửa sổ
+        self.focus_copmi08_window()
+        time.sleep(0.2)
 
         # Bước 1: Nhấp vào X 167 Y 198 -> Nhập A234 -> Bấm TAB
         logger.info(f"Bước 1: Click ô Loại phiếu tại ({x_head}, {y_head}) -> Gõ '{doc_type}' -> Bấm TAB")

@@ -176,7 +176,7 @@ def run_automation(dry_run=False, login_only=False, sheet_only=False, process_na
         password=config.get("erp_password", "")
     )
 
-    if not dry_run:
+    if not dry_run and not is_copmi08:
         try:
             _, is_running = gui_controller.launch_or_connect()
             gui_controller.auto_login(was_already_running=is_running)
