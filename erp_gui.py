@@ -712,6 +712,63 @@ class ERPGUIController:
             logger.warning(f"Lỗi khi focus cửa sổ COPMI08: {e}")
         return False
 
+    def dismiss_copmi08_dialog_if_any(self) -> bool:
+        """
+        Tự động phát hiện và bấm OK khi xuất hiện hộp thoại cảnh báo trên COPMI08:
+        (ví dụ: W-100091: Lượng tồn kho hoặc lượng số đợt hoặc số lượng bao bì tồn kho... không đủ)
+        """
+        try:
+            import ctypes
+            from ctypes import wintypes
+            user32 = ctypes.windll.user32
+            
+            WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+            state = {"dismissed": False}
+            
+            def enum_win_cb(hwnd, lparam):
+                if user32.IsWindowVisible(hwnd):
+                    length = user32.GetWindowTextLengthW(hwnd)
+                    if length > 0:
+                        buf = ctypes.create_unicode_buffer(length + 1)
+                        user32.GetWindowTextW(hwnd, buf, length + 1)
+                        title = buf.value.lower()
+                        
+                        # Nhận diện các popup của COPMI08 hoặc hộp thoại cảnh báo của ERP
+                        if any(k in title for k in ["copmi08", "đơn bán hàng", "thao tác", "w-100", "cảnh báo", "lỗi", "warning", "confirm"]):
+                            rect = wintypes.RECT()
+                            user32.GetWindowRect(hwnd, ctypes.byref(rect))
+                            width = rect.right - rect.left
+                            height = rect.bottom - rect.top
+                            
+                            # Hộp thoại cảnh báo thường nhỏ (150 < width < 800 và 80 < height < 500)
+                            if 150 < width < 800 and 80 < height < 500:
+                                logger.info(f"--> [COPMI08 Dialog] Phát hiện popup '{buf.value}' ({width}x{height}). Đang bấm OK...")
+                                
+                                try:
+                                    user32.SetForegroundWindow(hwnd)
+                                except Exception:
+                                    pass
+                                
+                                # Tính toán tọa độ nút OK theo vị trí hộp thoại thực tế trên màn hình
+                                ok_x = rect.left + int(width * 0.55)
+                                ok_y = rect.top + int(height * 0.75)
+                                if not (rect.left < ok_x < rect.right and rect.top < ok_y < rect.bottom):
+                                    ok_x, ok_y = 1015, 588
+                                
+                                pyautogui.click(ok_x, ok_y)
+                                time.sleep(0.04)
+                                pyautogui.press('enter')
+                                time.sleep(0.08)
+                                state["dismissed"] = True
+                                return False
+                return True
+            
+            user32.EnumWindows(WNDENUMPROC(enum_win_cb), 0)
+            return state["dismissed"]
+        except Exception as e:
+            logger.warning(f"Lỗi kiểm tra dialog COPMI08: {e}")
+            return False
+
     def process_copmi08_voucher(self, date_str: str, items: list, coords: dict = None):
         """
         Quy trình tự động hóa cho chứng từ COPMI08 trên ERP.
@@ -741,6 +798,8 @@ class ERPGUIController:
         # Focus trực tiếp cửa sổ COPMI08 đã mở sẵn max size mà không làm ẩn/thu nhỏ cửa sổ
         self.focus_copmi08_window()
         time.sleep(0.2)
+        while self.dismiss_copmi08_dialog_if_any():
+            time.sleep(0.05)
 
         # Bước 1: Nhấp vào X 167 Y 198 -> Nhập A234 -> Bấm TAB
         logger.info(f"Bước 1: Click ô Loại phiếu tại ({x_head}, {y_head}) -> Gõ '{doc_type}' -> Bấm TAB")
@@ -788,6 +847,8 @@ class ERPGUIController:
             time.sleep(0.03)
             pyautogui.press('tab')
             time.sleep(0.06)
+            while self.dismiss_copmi08_dialog_if_any():
+                time.sleep(0.05)
 
             # Bước 5: Nhập ô G (Kg) -> TAB 2 lần
             pyperclip.copy(str(qty_kg))
@@ -797,6 +858,8 @@ class ERPGUIController:
             time.sleep(0.03)
             pyautogui.press('tab')
             time.sleep(0.06)
+            while self.dismiss_copmi08_dialog_if_any():
+                time.sleep(0.05)
 
             # Bước 6: Nhập ô F (Tấm) -> TAB 1 lần
             pyperclip.copy(str(qty_tam))
@@ -804,6 +867,8 @@ class ERPGUIController:
             time.sleep(0.06)
             pyautogui.press('tab')
             time.sleep(0.06)
+            while self.dismiss_copmi08_dialog_if_any():
+                time.sleep(0.05)
 
             # Bước 7: Nhập ô J (Ghi chú) -> Nhấn phím mũi tên xuống -> Nhấn phím TAB
             pyperclip.copy(str(note))
@@ -813,6 +878,8 @@ class ERPGUIController:
             time.sleep(0.05)
             pyautogui.press('tab')
             time.sleep(0.06)
+            while self.dismiss_copmi08_dialog_if_any():
+                time.sleep(0.05)
 
         logger.info(f"✅ ĐÃ NHẬP XONG HOÀN TẤT PHIẾU COPMI08 CHO NGÀY: {date_str} ({len(items)} DÒNG)!")
         return True
