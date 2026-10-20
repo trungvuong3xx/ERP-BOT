@@ -4,6 +4,7 @@
     "btp_spreadsheet_id": "1KlAdGFca-FCmTrzPrjCMUMK2pTOfMHxFFH-keCkdr1A",
     "btp_sheet_name": "Tổng Hợp",
     "coords_copmi08": {
+        "btn_add": [26, 130],
         "header_doc_type": [167, 198],
         "first_row_code": [341, 513],
         "doc_type_val": "A234",

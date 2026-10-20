@@ -774,20 +774,22 @@ class ERPGUIController:
         Quy trình tự động hóa cho chứng từ COPMI08 trên ERP.
         Người dùng luôn mở full cửa sổ sẵn.
         Các bước:
-        Bước 1: Nhấp vào X 167 Y 198 -> Nhập A234 -> Bấm TAB
-        Bước 2: Nhập ngày ở cột C2 Ví dụ 2026/10/19 -> Bấm TAB
-        Bước 3: Nhập VN0003
-        Bước 4: Nhấp vào X 341 Y 513 -> Nhập ô P6 -> TAB 2 lần
-        Bước 5: Nhập ô G6 -> TAB 2 lần
-        Bước 6: Nhập ô F6 -> TAB 1 lần
-        Bước 7: Nhập ô J6 -> Nhấn phím mũi tên xuống -> Nhấn phím TAB
-        Bước 8+: Nhập ô P(i) -> tiếp tục lặp lại bước 5 đến bước 7 cho đến hết dữ liệu
+        Bước 1: Nhấp vào X 26 Y 130 (Nút Thêm)
+        Bước 2: Nhấp vào X 167 Y 198 -> Nhập A234 -> Bấm TAB
+        Bước 3: Nhập ngày ở cột C2 Ví dụ 2026/10/19 -> Bấm TAB
+        Bước 4: Nhập VN0003
+        Bước 5: Nhấp vào X 341 Y 513 -> Nhập ô P6 -> TAB 2 lần
+        Bước 6: Nhập ô G6 -> TAB 2 lần
+        Bước 7: Nhập ô F6 -> TAB 1 lần
+        Bước 8: Nhập ô J6 -> Nhấn phím mũi tên xuống -> Nhấn phím TAB
+        Bước 9+: Nhập ô P(i) -> tiếp tục lặp lại các bước cho đến hết dữ liệu
         """
         if not items:
             logger.warning("[COPMI08] Không có dữ liệu sản phẩm để nhập!")
             return False
 
         coords = coords or {}
+        x_add, y_add = coords.get("btn_add", [26, 130])
         x_head, y_head = coords.get("header_doc_type", [167, 198])
         doc_type = coords.get("doc_type_val", "A234")
         cust_code = coords.get("customer_val", "VN0003")
@@ -801,8 +803,15 @@ class ERPGUIController:
         while self.dismiss_copmi08_dialog_if_any():
             time.sleep(0.05)
 
-        # Bước 1: Nhấp vào X 167 Y 198 -> Nhập A234 -> Bấm TAB
-        logger.info(f"Bước 1: Click ô Loại phiếu tại ({x_head}, {y_head}) -> Gõ '{doc_type}' -> Bấm TAB")
+        # Bước 1: Nhấp vào X 26 Y 130 (Nút Thêm)
+        logger.info(f"Bước 1: Click nút Thêm tại ({x_add}, {y_add})")
+        pyautogui.click(x_add, y_add)
+        time.sleep(1.2)
+        while self.dismiss_copmi08_dialog_if_any():
+            time.sleep(0.05)
+
+        # Bước 2: Nhấp vào X 167 Y 198 -> Nhập A234 -> Bấm TAB
+        logger.info(f"Bước 2: Click ô Loại phiếu tại ({x_head}, {y_head}) -> Gõ '{doc_type}' -> Bấm TAB")
         pyautogui.click(x_head, y_head)
         time.sleep(0.3)
         pyperclip.copy(doc_type)
@@ -811,22 +820,22 @@ class ERPGUIController:
         pyautogui.press('tab')
         time.sleep(0.2)
 
-        # Bước 2: Nhập ngày ở cột C2 (Ví dụ 2026/10/19) -> Bấm TAB
-        logger.info(f"Bước 2: Gõ Ngày: '{date_str}' -> Bấm TAB")
+        # Bước 3: Nhập ngày ở cột C2 (Ví dụ 2026/10/19) -> Bấm TAB
+        logger.info(f"Bước 3: Gõ Ngày: '{date_str}' -> Bấm TAB")
         pyperclip.copy(date_str)
         pyautogui.hotkey('ctrl', 'v')
         time.sleep(0.2)
         pyautogui.press('tab')
         time.sleep(0.2)
 
-        # Bước 3: Nhập VN0003
-        logger.info(f"Bước 3: Gõ Mã Khách hàng: '{cust_code}'")
+        # Bước 4: Nhập VN0003
+        logger.info(f"Bước 4: Gõ Mã Khách hàng: '{cust_code}'")
         pyperclip.copy(cust_code)
         pyautogui.hotkey('ctrl', 'v')
         time.sleep(0.3)
 
-        # Bước 4: Nhấp vào X 341 Y 513
-        logger.info(f"Bước 4: Click ô Mã SP Dòng 1 tại ({x_row1}, {y_row1})")
+        # Bước 5: Nhấp vào X 341 Y 513
+        logger.info(f"Bước 5: Click ô Mã SP Dòng 1 tại ({x_row1}, {y_row1})")
         pyautogui.click(x_row1, y_row1)
         time.sleep(0.4)
 
