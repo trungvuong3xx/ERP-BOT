@@ -756,9 +756,9 @@ class ERPGUIController:
                                     ok_x, ok_y = 1015, 588
                                 
                                 pyautogui.click(ok_x, ok_y)
-                                time.sleep(0.04)
+                                time.sleep(0.06)
                                 pyautogui.press('enter')
-                                time.sleep(0.08)
+                                time.sleep(0.15)
                                 state["dismissed"] = True
                                 return False
                 return True
@@ -870,16 +870,31 @@ class ERPGUIController:
             while self.dismiss_copmi08_dialog_if_any():
                 time.sleep(0.05)
 
-            # Bước 7: Nhập ô J (Ghi chú) -> Nhấn phím mũi tên xuống -> Nhấn phím TAB
+            # Bước 7: Nhập ô J (Ghi chú)
             pyperclip.copy(str(note))
             pyautogui.hotkey('ctrl', 'v')
-            time.sleep(0.06)
-            pyautogui.press('down')
-            time.sleep(0.05)
-            pyautogui.press('tab')
-            time.sleep(0.06)
-            while self.dismiss_copmi08_dialog_if_any():
-                time.sleep(0.05)
+            time.sleep(0.08)
+
+            # Chỉ cần chuyển dòng nếu chưa phải dòng cuối cùng
+            if idx < len(items):
+                # Bấm phím mũi tên xuống để tạo/chuyển sang dòng mới
+                pyautogui.press('down')
+                time.sleep(0.15)
+
+                # BƯỚC QUAN TRỌNG: Kiểm tra và tắt hộp thoại cảnh báo (W-100091) TRƯỚC KHI BẤM TAB
+                # Để phím TAB không bị hộp thoại nuốt mất!
+                while self.dismiss_copmi08_dialog_if_any():
+                    time.sleep(0.1)
+
+                # Sau khi hộp thoại đã tắt hoàn toàn, tiêu điểm về ô đầu tiên ('Mã SP nghiệp vụ')
+                # Bấm TAB để chuyển sang ô 'Mã SP' cho dòng tiếp theo
+                time.sleep(0.12)
+                pyautogui.press('tab')
+                time.sleep(0.1)
+
+                # Kiểm tra dự phòng nếu có thông báo phát sinh sau khi TAB
+                while self.dismiss_copmi08_dialog_if_any():
+                    time.sleep(0.1)
 
         logger.info(f"✅ ĐÃ NHẬP XONG HOÀN TẤT PHIẾU COPMI08 CHO NGÀY: {date_str} ({len(items)} DÒNG)!")
         return True
